@@ -1,0 +1,107 @@
+.view-navigation { display: flex; gap: 22px; padding: 0 5%; border-bottom: 1px solid #dde4da; }
+.view-navigation > button { border: 0; border-bottom: 3px solid transparent; padding: 19px 0 16px; color: #7f8b77; background: transparent; font-size: 13px; }
+.view-navigation > button[aria-current='page'] { color: #254a32; border-bottom-color: #52794a; font-weight: 600; }
+.view-navigation > button > span { font-size: 9px; border-radius: 4px; background: #e2eddb; color: #6e8c56; padding: 4px 6px; margin-left: 8px; }
+.remote-heading { margin-bottom: 23px; }
+.remote-badge { color: #527447; background: #e8f0e1; border: 1px solid #dbe6d2; border-radius: 20px; padding: 10px 16px; font-size: 11px; white-space: nowrap; }
+.remote-explanation { display: flex; align-items: center; gap: 15px; color: #78876e; padding: 0 0 26px; font-size: 12px; line-height: 1.8; max-width: 1100px; }
+.remote-house { font-size: 29px; color: #648b4f; flex-shrink: 0; }
+.remote-controls { padding: 25px; margin-bottom: 23px; }
+.remote-controls label { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.remote-controls label > span { font-size: 11px; color: #7a8871; }
+.remote-controls input[type='search'], .remote-controls select { width: 100%; min-width: 0; height: 44px; border: 1px solid #dbe3d5; background: white; color: #344e30; border-radius: 7px; padding: 0 12px; font-size: 12px; }
+.remote-search { display: flex; align-items: flex-end; gap: 12px; }
+.remote-search > label { flex: 1; }
+.remote-search > button { height: 44px; padding: 0 28px; background: #294d36; border: 0; border-radius: 7px; color: white; font-size: 12px; }
+.remote-selects { display: grid; grid-template-columns: 1.25fr 1.5fr 1fr .8fr; gap: 16px; margin-top: 20px; }
+.remote-toggles { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 23px; margin-top: 20px; }
+.remote-toggles > label { flex-direction: row; align-items: center; font-size: 11px; line-height: 1.6; color: #677b5b; }
+.remote-toggles input { accent-color: #52794a; width: 15px; height: 15px; margin: 0; flex-shrink: 0; }
+.quick-filter { padding: 7px 12px; border: 1px solid #dae5d1; border-radius: 15px; color: #6b8658; background: #f7faf3; font-size: 11px; }
+.quick-filter.selected { color: #fff; background: #52794a; border-color: #52794a; }
+.remote-active-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+.remote-active-filters > button { border: 1px solid #d3e2c7; color: #4b6d3b; background: #eaf2e3; border-radius: 6px; padding: 8px 12px; font-size: 11px; text-align: left; overflow-wrap: anywhere; }
+.remote-metrics .metric p { font-size: 12px; }
+.remote-metrics .metric small { font-size: 10px; line-height: 1.8; }
+.remote-metrics .metric strong { font-size: clamp(24px, 2.6vw, 37px); }
+.remote-takeaway { border-left: 3px solid #85a96b; padding: 9px 20px; margin: 32px 0; }
+.remote-takeaway strong { font-size: 17px; font-weight: 500; line-height: 1.6; }
+.remote-takeaway p { color: #85917b; font-size: 12px; margin-top: 9px; line-height: 1.9; }
+.remote-professions { margin-bottom: 25px; overflow: hidden; }
+.remote-professions .panel-heading { padding: 25px; }
+.remote-professions td:first-child { width: 40%; }
+.remote-professions td { font-size: 13px; padding: 18px 22px; }
+.remote-professions th { font-size: 10px; }
+.remote-professions td small { font-size: 10px; }
+.profession-button { color: #314d30; background: transparent; border: 0; text-align: left; padding: 0; line-height: 1.7; font-size: 13px; }
+.profession-button:hover { color: #6b914f; text-decoration: underline; }
+.profession-button > span { color: #8ba077; }
+.remote-professions tr.is-selected { background: #f2f8ec; }
+.remote-show-more { margin: 10px 25px; }
+.remote-detail-grid { display: grid; grid-template-columns: 1.15fr 1fr; align-items: start; gap: 24px; margin-bottom: 25px; }
+.remote-detail-grid > section { padding: 25px; min-width: 0; }
+.remote-detail-grid h2 { font-size: 17px; }
+.remote-detail-grid .chart-note { font-size: 11px; margin-top: 14px; line-height: 1.9; }
+.title-ranking { display: grid; margin-top: 20px; }
+.title-ranking > button { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 14px 0; border: 0; border-bottom: 1px solid #e9efe2; text-align: left; color: #465b3c; background: transparent; font-size: 12px; line-height: 1.7; }
+.title-ranking > button > span { overflow-wrap: anywhere; }
+.title-ranking > button > strong { font-weight: 600; flex-shrink: 0; }
+.title-ranking > button:hover, .title-ranking > button.selected { color: #70964f; }
+.technology-chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+.technology-chips > button { padding: 10px 13px; border: 1px solid #dce6d3; border-radius: 8px; display: flex; align-items: center; gap: 15px; color: #577443; background: #f8fbf5; font-size: 12px; }
+.technology-chips > button strong { font-size: 11px; font-weight: 500; background: #e6efd9; padding: 3px 6px; border-radius: 4px; }
+.technology-chips > button.selected { border-color: #70965b; background: #e9f2e0; }
+.remote-exp-summary { border-top: 1px solid #e6eddf; padding-top: 22px; margin-top: 30px; }
+.remote-exp-summary h3 { font-size: 13px; font-weight: 500; margin: 0 0 12px; }
+.remote-exp-summary button { display: grid; grid-template-columns: 1fr auto 40px; gap: 15px; width: 100%; border: 0; background: transparent; padding: 11px 0; color: #7a8b6a; text-align: left; font-size: 12px; }
+.remote-exp-summary button strong { font-weight: 500; color: #425e31; }
+.remote-exp-summary button small { text-align: right; color: #9aa68c; }
+.remote-vacancies td { font-size: 12px; }
+.remote-vacancies td small { font-size: 11px; }
+.remote-row-badge, .mixed-row-badge { display: inline-block; margin: 8px 7px 0 0; padding: 3px 7px; border-radius: 4px; font-size: 9px; color: #73945b; background: #edf4e5; }
+.mixed-row-badge { color: #a58441; background: #faf3e2; }
+.remote-pagination { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px; gap: 15px; border-top: 1px solid #e5ecdd; }
+.remote-pagination > button { border: 1px solid #d7e2cc; background: #fff; color: #5c7e45; border-radius: 6px; padding: 9px 13px; font-size: 11px; }
+.remote-pagination > button:disabled { cursor: default; opacity: .35; }
+.remote-pagination > span { font-size: 11px; color: #8e9b80; }
+.remote-results .empty .control-button { margin-top: 22px; }
+.curated-navigation a { color: #647b54; text-decoration: none; font-size: 12px; padding: 18px 0; }
+.selection-rules { padding: 18px 23px; margin-bottom: 22px; color: #6c7f61; font-size: 12px; line-height: 1.9; }
+.selection-rules summary, .rejection-summary summary, .title-variants summary, .vacancy-details summary { cursor: pointer; }
+.selection-rules p { margin-top: 12px; }
+.curated-collector { margin-bottom: 25px; }
+.collector-strategy { display: flex; gap: 10px 20px; flex-wrap: wrap; font-size: 11px; line-height: 1.8; color: #718267; margin: 14px 0; }
+.collector-strategy strong { color: #47633b; font-weight: 500; }
+.rejection-summary p { margin: 10px 0; line-height: 1.8; }
+.rejection-summary { font-size: 11px; color: #889578; margin-top: 16px; }
+.rejection-summary > div { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-top: 12px; }
+.title-variants { font-size: 10px; color: #879976; margin-top: 5px; }
+.vacancy-details { margin-top: 10px; font-size: 11px; color: #718965; }
+.vacancy-details p { font-size: 11px; line-height: 1.9; margin-top: 12px; }
+.description-text { white-space: pre-wrap; max-height: 350px; overflow-y: auto; }
+.matched-skills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.matched-skills button { border: 1px solid #d9e5d0; color: #587d43; background: #f3f8ed; padding: 5px 7px; border-radius: 5px; font-size: 10px; }
+.vacancy-details blockquote { margin: 12px 0; border-left: 2px solid #97b77f; padding-left: 12px; color: #526d40; }
+.curated-view .remote-professions { scroll-margin-top: 20px; }
+.curated-skills { align-items: stretch; }
+@media (max-width: 1000px) { .remote-selects { grid-template-columns: 1fr 1fr; } .remote-badge { display: none; } .remote-detail-grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .view-navigation { gap: 18px; }
+  .view-navigation > button { font-size: 12px; padding-top: 16px; }
+  .view-navigation > button > span { display: none; }
+  .remote-explanation { font-size: 11px; align-items: flex-start; }
+  .remote-house { font-size: 25px; }
+  .remote-controls { padding: 18px; }
+  .remote-search { gap: 8px; }
+  .remote-search > button { padding: 0 18px; }
+  .remote-selects { gap: 16px 10px; }
+  .remote-metrics .metric strong { font-size: 24px; }
+  .remote-takeaway { padding: 6px 15px; }
+  .remote-takeaway strong { font-size: 15px; }
+  .remote-detail-grid > section { padding: 22px; }
+  .remote-professions .panel-heading { flex-wrap: wrap; padding: 22px; }
+  .remote-detail-grid .panel-heading { align-items: flex-start; flex-wrap: wrap; }
+  .remote-pagination { padding: 18px 15px; }
+  .remote-pagination > button { padding: 9px; }
+  .remote-pagination > span { font-size: 10px; }
+}

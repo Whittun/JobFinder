@@ -1,0 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&display=swap');
+
+:root {
+  font-family: 'Golos Text', 'Segoe UI', sans-serif;
+  color: #22342e;
+  background: #f4f6f3;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-weight: 400;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, input, select { font: inherit; }
+button, a, input, select { -webkit-tap-highlight-color: transparent; }
+button, select { cursor: pointer; }
+button:disabled { cursor: wait; opacity: .65; }
+a { color: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #7caf64; outline-offset: 4px; }
+button { transition: background .2s; }
+p, h1, h2 { margin: 0; }
+::selection { background: #cee6b1; }

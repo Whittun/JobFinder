@@ -1,0 +1,37 @@
+{
+  "account": { "internalValue": "not-for-the-client" },
+  "vacancySearchResult": {
+    "totalResults": 40,
+    "vacancies": [
+      {
+        "vacancyId": 101,
+        "name": "Разработчик C++ & React",
+        "company": { "id": 10, "name": "Компания & Co", "contactInfo": "not-for-the-client" },
+        "area": { "@id": 1, "name": "Москва" },
+        "publicationTime": { "@timestamp": 1793100000, "$": "2026-10-27T12:00:00+03:00" },
+        "compensation": { "from": 100000, "to": 150000, "perModeFrom": 100000, "perModeTo": 150000, "currencyCode": "RUR", "gross": false, "mode": "MONTH" },
+        "workExperience": "between1And3",
+        "workFormats": [{ "workFormatsElement": ["REMOTE", "HYBRID"] }]
+      },
+      {
+        "vacancyId": 102,
+        "name": "Тестировщик",
+        "company": { "id": 11, "visibleName": "Команда QA" },
+        "area": { "@id": 2, "name": "Санкт-Петербург" },
+        "publicationTime": { "$": "2026-10-27T13:00:00+03:00" },
+        "compensation": { "from": 200000, "perModeFrom": 1250, "currencyCode": "RUR", "gross": true, "mode": "HOUR" },
+        "workExperience": "noExperience",
+        "workFormats": [{ "workFormatsElement": ["ON_SITE"] }]
+      }
+    ]
+  },
+  "searchClusters": {
+    "experience": {
+      "groups": {
+        "between1And3": { "count": 25, "title": "От 1 года до 3 лет", "id": "between1And3" },
+        "noExperience": { "count": 15, "title": "Нет опыта", "id": "noExperience" }
+      }
+    },
+    "area": { "groups": { "113": { "count": 40, "title": "Россия" }, "1": { "count": 25, "title": "Москва" } } }
+  }
+}
