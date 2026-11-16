@@ -9,8 +9,6 @@ test('priority dictionary identifies each area and explains matches using actual
   const samples = [
     ['web', { name: 'Frontend-разработчик', key_skills: ['React'] }],
     ['development', { name: 'Senior Backend Developer' }],
-    ['influence', { name: 'Менеджер по работе с блогерами' }],
-    ['influence', { name: 'Маркетолог', description: 'Задачи: поиск и подбор блогеров для рекламных интеграций.' }],
     ['security', { name: 'Инженер по информационной безопасности' }],
     ['security', { name: 'Инженер', description: 'Задачи: проведение тестирования на проникновение.' }],
     ['devops', { name: 'SRE / DevOps Engineer' }],
@@ -49,7 +47,7 @@ test('general marketing, HR, security boilerplate and incidental tech do not bec
 const job = (id, name, extra = {}) => ({
   id: String(id), name, employer: { id: String(id), name: `Компания ${id}` },
   area: { id: '1', name: 'Москва' }, published_at: new Date().toISOString(),
-  description: 'Работа над задачами команды. Ведение документации, участие в обсуждении и планировании.',
+  description: 'Работа над задачами команды. Ведение документации веб-сервисов, участие в обсуждении и планировании.',
   detail_fetched_at: new Date().toISOString(), work_format: [{ id: 'REMOTE', name: 'Удалённо' }],
   ...extra,
 })
@@ -62,7 +60,7 @@ function database(t, jobs) {
 const filters = { ...defaultRemoteFilters, priority: 'any' }
 
 test('priority overview counts overlapping directions but union, metrics and pages contain unique jobs', t => {
-  const store = database(t, [job(1, 'Frontend-разработчик', { key_skills: ['React'] }), job(2, 'QA Engineer'), job(3, 'SMM-менеджер')])
+  const store = database(t, [job(1, 'Frontend-разработчик', { key_skills: ['React'] }), job(2, 'QA Engineer'), job(3, 'Техническая поддержка')])
   const result = store.analytics(filters)
   assert.equal(result.priority.candidates, 3)
   assert.equal(result.priority.total, 2)
@@ -97,8 +95,6 @@ test('priority filters intersect remote format, skills, dates, title groups and 
   assert.deepEqual(empty.priority.matches, {})
   const first = store.analytics(filters)
   assert.equal(store.analytics({ ...filters, group: first.remote.groups[0].id }).totals.filtered, 1)
-  store.ingest({ items: [job(4, 'Менеджер по работе с блогерами')] })
-  assert.equal(store.analytics({ ...filters, priority: 'influence' }).recent[0].id, '4')
 })
 
 test('priority pagination is disjoint and all classification reads preserve payloads and timestamps', t => {

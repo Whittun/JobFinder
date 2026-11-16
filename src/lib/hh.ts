@@ -26,6 +26,13 @@ export type Vacancy = {
   closed?: boolean
   normalized_title?: Named
   skill_mentions?: { name: string; category: string; source: string; evidence: string }[]
+  source?: { id: string; name: string; url: string; originalUrl?: string }
+  origins?: { source: string; name: string; url: string }[]
+  date_estimated?: boolean
+  salary_text?: string
+  professional_level?: string
+  applicant_locations?: string[]
+  excluded_locations?: string[]
 }
 export type Cluster = { id: string; name: string; items: { id?: string; name: string; count: number }[] }
 export type Taxonomy = { roles: (Named & { directionIds: string[] })[]; directions: (Named & { roleIds: string[] })[] }
@@ -69,7 +76,7 @@ export function salaryOf(vacancy: Vacancy) {
 
 export function formatSalary(vacancy: Vacancy) {
   const salary = salaryOf(vacancy)
-  if (!salary || (salary.from == null && salary.to == null)) return 'Зарплата не указана'
+  if (!salary || (salary.from == null && salary.to == null)) return vacancy.salary_text || 'Зарплата не указана'
   const currency = salary.currency === 'RUR' ? '₽' : salary.currency
   const range = salary.from != null && salary.to != null
     ? `${number(salary.from)}–${number(salary.to)}`

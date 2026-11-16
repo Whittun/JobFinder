@@ -24,7 +24,7 @@ function sample() {
   const data = parseSearchPage(`<template id="HH-Lux-InitialState">${JSON.stringify(state)}</template>`, 'https://hh.ru/search/vacancy')
   for (const item of data.items) {
     item.work_format = [{id:'REMOTE',name:'Удалённо'}]
-    item.description = 'Разработка и сопровождение программных продуктов. Работа с технической документацией и командой.'
+    item.description = 'Разработка и сопровождение веб-сервисов. Работа с технической документацией и командой.'
     item.detail_fetched_at = now
   }
   return data
@@ -130,7 +130,7 @@ test('collector bootstraps the whole taxonomy, saves results and resumes without
     return new Response(`<template id="HH-Lux-InitialState">${JSON.stringify(state)}</template>`)
   })
   await collector.tick()
-  assert.equal(collector.store.taskStats().pending, 9) // Two role formats, six influence searches and one candidate.
+  assert.equal(collector.store.taskStats().pending, 15) // Two web role formats, twelve keyword searches and one candidate.
   assert.equal(collector.store.taskStats().done, 1)
   assert.equal(collector.store.analytics(defaultAnalyticsFilters).totals.market, 40)
   collector.control(false)

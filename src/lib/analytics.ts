@@ -1,8 +1,9 @@
 import type { Named, Vacancy } from './hh.ts'
 import type { PriorityMatch } from './priorities.ts'
+import type { Recommendation } from './recommendations.ts'
 
-export type AnalyticsFilters = { text: string; area: string; period: string; direction: string; profession: string; workFormat: string; experience: string; technology: string; title: string; salary: string; page: string; group: string; priority: string }
-export const defaultAnalyticsFilters: AnalyticsFilters = { text: '', area: '113', period: '30', direction: '', profession: '', workFormat: 'REMOTE_ONLY', experience: '', technology: '', title: '', salary: 'any', page: '0', group: '', priority: '' }
+export type AnalyticsFilters = { text: string; area: string; period: string; direction: string; profession: string; workFormat: string; experience: string; technology: string; title: string; salary: string; page: string; group: string; priority: string; recommendation: string }
+export const defaultAnalyticsFilters: AnalyticsFilters = { text: '', area: '113', period: '30', direction: '', profession: '', workFormat: 'REMOTE_ONLY', experience: '', technology: '', title: '', salary: 'any', page: '0', group: '', priority: '', recommendation: '' }
 export const defaultRemoteFilters: AnalyticsFilters = { ...defaultAnalyticsFilters, workFormat: 'REMOTE_ONLY' }
 export const experienceOptions = [
   { id: 'noExperience', name: 'Нет опыта' }, { id: 'between1And3', name: 'От 1 года до 3 лет' },
@@ -23,6 +24,8 @@ export type CollectorStatus = {
   };
 }
 export type Analytics = {
+  marketPolicy?: { version: string; included: number; hidden: number; exclusions: { reason: string; name: string; count: number }[] }
+  processedTotal: number
   status: CollectorStatus
   totals: { stored: number; filtered: number; market: number | null; employers: number; withSalary: number; medianLower: number | null; salaryCount: number }
   market: { professions: Ranking[]; directions: Ranking[] }
@@ -30,6 +33,7 @@ export type Analytics = {
   options: { professions: Named[]; directions: Named[]; groups: Named[] }
   recent: Vacancy[]
   priority?: { total: number; candidates: number; directions: Ranking[]; matches: Record<string, PriorityMatch[]> }
+  recommendations?: Record<string, Recommendation>
   remote?: {
     professions: ProfessionSummary[]; titles: Ranking[]; tagged: number;
     available: number; mixedExcluded: number; page: number; pageSize: number; totalPages: number

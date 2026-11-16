@@ -4,14 +4,18 @@ import type { PreviewServer, ViteDevServer } from 'vite'
 import { Collector } from './collector.ts'
 import { experienceOptions } from '../src/lib/analytics.ts'
 import { priorityDirections } from '../src/lib/priorities.ts'
+import { workspaceApi } from './workspace-api.ts'
+import { sourcesApi } from './sources-api.ts'
 
 export function attachAnalytics(server: ViteDevServer | PreviewServer) {
-  const collector = new Collector(resolve(process.cwd(), 'data/jobfinder.sqlite'))
+  const collector = new Collector(resolve(process.cwd(), process.env.JOBFINDER_DB || 'data/jobfinder.sqlite'))
   collector.start()
   server.httpServer?.once('close', () => { void collector.close() })
   server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const url = new URL(req.url || '/', 'http://localhost')
     if (url.pathname.startsWith('/data/')) { res.writeHead(403).end(); return }
+    if (await sourcesApi(req, res, url, collector)) return
+    if (await workspaceApi(req, res, url, collector.store.workspace)) return
     if (!['/api/analytics', '/api/collector'].includes(url.pathname)) return next()
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
     res.setHeader('Cache-Control', 'no-store')
@@ -46,11 +50,13 @@ export function attachAnalytics(server: ViteDevServer | PreviewServer) {
       const page = url.searchParams.get('page') || '0'
       const group = url.searchParams.get('group') || ''
       const priority = url.searchParams.get('priority') || ''
+      const recommendation = url.searchParams.get('recommendation') || ''
+      if (!['', 'development'].includes(recommendation)) { send(400, { message: 'Неизвестный раздел рекомендаций.' }); return }
       if (priority && priority !== 'any' && !priorityDirections.some(item => item.id === priority)) { send(400, { message: 'Неизвестное приоритетное направление.' }); return }
       if (text.length > 200 || !['113','1','2','3','4','88'].includes(area) || !['1','7','30','90'].includes(period) || !/^(category-\d+)?$/.test(direction) || !/^\d*$/.test(profession) || profession.length > 10 || !['REMOTE','REMOTE_ONLY'].includes(workFormat) || (experience && !experienceOptions.some(item => item.id === experience)) || technology.length > 40 || title.length > 1000 || !['any','specified'].includes(salary) || !/^\d{1,5}$/.test(page) || Number(page) > 10000 || !/^[a-z0-9-]*$/.test(group) || group.length > 100) {
         send(400, { message: 'Некорректные фильтры.' }); return
       }
-      send(200, collector.store.analytics({ text, area, period, direction, profession, workFormat, experience, technology, title, salary, page, group, priority }))
+      send(200, collector.store.analytics({ text, area, period, direction, profession, workFormat, experience, technology, title, salary, page, group, priority, recommendation }))
     } catch {
       send(500, { message: 'Не удалось прочитать локальную базу. Проверьте журнал сервера.' })
     }

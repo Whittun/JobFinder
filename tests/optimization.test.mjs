@@ -8,9 +8,9 @@ import { candidateChanged, DETAIL_TTL, DISCOVERY_INTERVAL, MIN_INTERVAL, QUEUE_V
 
 const roles = [{ id: '1', name: 'Разработчик' }, { id: '2', name: 'Бухгалтер' }, { id: '3', name: 'Менеджер по продажам' }]
 const base = { from: shiftDay(moscowDay(), -29), to: moscowDay(), cycle: 'first' }
-const job = (id, name = 'Менеджер по работе с блогерами', format = 'REMOTE') => ({
+const job = (id, name = 'Backend developer', format = 'REMOTE') => ({
   id: String(id), name, published_at: new Date().toISOString(), area: { id: '1', name: 'Москва' },
-  employer: { id: '1', name: 'Компания' }, description: 'Ведение документации и работа над задачами команды. Планирование и обсуждение задач.',
+  employer: { id: '1', name: 'Компания' }, description: 'Разработка веб-сервисов и работа над задачами команды. Планирование и обсуждение задач.',
   work_format: [{ id: format, name: format === 'REMOTE' ? 'Удалённо' : 'Гибрид' }],
   detail_fetched_at: new Date().toISOString(),
 })
@@ -32,10 +32,10 @@ function fullPage(candidate) {
 
 test('separate format searches preserve focus keywords in partitions and filter out excluded roles', () => {
   const plan = searchPlan(roles, base)
-  assert.equal(plan.length, 10)
+  assert.equal(plan.length, 14)
   for (const format of ['REMOTE', 'HYBRID']) {
-    assert.equal(plan.filter(task => task.format === format && task.kind === 'focus').length, 3)
-    assert.equal(plan.filter(task => task.format === format && task.kind === 'profession').length, 2)
+    assert.equal(plan.filter(task => task.format === format && task.kind === 'focus').length, 6)
+    assert.equal(plan.filter(task => task.format === format && task.kind === 'profession').length, 1)
   }
   assert.equal(plan.some(task => task.roles?.includes('3')), false)
   for (const seed of plan) {
@@ -51,15 +51,15 @@ test('separate format searches preserve focus keywords in partitions and filter 
   }
 })
 
-test('queue fills remote influence and development before other remote jobs and hybrid, regardless of slot preference', t => {
+test('queue fills remote web roles before other remote jobs and hybrid, regardless of slot preference', t => {
   const store = database(t)
   store.enqueueMany([
-    detail(job(1, 'Менеджер по работе с блогерами', 'HYBRID')),
+    detail(job(1, 'Backend developer', 'HYBRID')),
     detail(job(2, 'Бухгалтер')), detail(job(3, 'Frontend developer')), detail(job(4)),
   ])
   const order = []
   for (const preferred of [false, true, false, true]) { const entry = store.next(preferred); order.push(entry.task.candidate.id); finish(store, entry) }
-  assert.deepEqual(order, ['4', '3', '2', '1'])
+  assert.deepEqual(order, ['3', '4', '2', '1'])
   assert.equal(store.next(), null)
 })
 
@@ -152,11 +152,11 @@ test('incremental discovery runs during a long backlog, overlaps the previous da
   const fetch = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Must not request during cooldown') })
   await collector.tick()
   assert.equal(fetch.mock.callCount(), 0)
-  assert.equal(store.taskStats().pending, 35)
+  assert.equal(store.taskStats().pending, 39)
   assert.deepEqual(store.get('discoveryWindow', {}), { from: shiftDay(moscowDay(Date.parse(previous)), -1), to: moscowDay() })
   assert.ok(store.get('nextDiscovery', 0) >= Date.now() + DISCOVERY_INTERVAL - 1000)
   await collector.tick()
-  assert.equal(store.taskStats().pending, 35)
+  assert.equal(store.taskStats().pending, 39)
 })
 
 test('consecutive access refusals across different jobs increase global cooldown and preserve it on resume', async t => {

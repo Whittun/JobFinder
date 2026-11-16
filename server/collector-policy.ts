@@ -1,9 +1,10 @@
+import { WEB_QUERIES } from './web-scope.ts'
 import { classifyPriorities } from '../src/lib/priorities.ts'
 import type { Vacancy } from '../src/lib/hh.ts'
 import { professionPriority, skipProfession } from './selection.ts'
 import type { CrawlTask } from './crawl-plan.ts'
 
-export const QUEUE_VERSION = 2
+export const QUEUE_VERSION = 3
 export const MIN_INTERVAL = 10_000
 export const DETAIL_TTL = 3 * 86_400_000
 export const REJECTION_TTL = 86_400_000
@@ -18,7 +19,7 @@ export function queuePriority(task: CrawlTask, roles: { id: string; name: string
     : task.format === 'HYBRID'
   const sample = task.candidate || { name: task.label }
   const matches = classifyPriorities(sample)
-  const topic = task.focus || matches.some(item => item.id === 'influence') ? 0
+  const topic = task.focus ? 0
     : matches.length ? 1
     : professionPriority(sample.name) === 0 || roles.some(role => task.candidate?.role_ids?.includes(role.id) && professionPriority(role.name) === 0) ? 2 : 3
   const kind = { market: 0, focus: 1, profession: 2, direction: 2, slice: 3, page: 4, detail: 2 }[task.kind]
@@ -28,8 +29,8 @@ export function queuePriority(task: CrawlTask, roles: { id: string; name: string
 export function searchPlan(roles: { id: string; name: string }[], base: Pick<CrawlTask, 'from' | 'to' | 'cycle'>): CrawlTask[] {
   const tasks: CrawlTask[] = []
   for (const format of ['REMOTE', 'HYBRID'] as const) {
-    for (const text of ['блогер', 'influence', 'инфлюенс']) tasks.push({ ...base, kind: 'focus', label: `Работа с блогерами: ${text}`, text, focus: true, format })
-    for (const role of roles.filter(role => !skipProfession(role.name))) tasks.push({ ...base, kind: 'profession', label: role.name, roles: [role.id], format })
+    for (const text of WEB_QUERIES) tasks.push({ ...base, kind: 'focus', label: `Веб: ${text}`, text, focus: true, format })
+    for (const role of roles.filter(role => !skipProfession(role.name) && /разработ|программист|тестиров|поддерж|devops|системн.*администратор/iu.test(role.name))) tasks.push({ ...base, kind: 'profession', label: role.name, roles: [role.id], format })
   }
   return tasks
 }

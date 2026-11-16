@@ -1,10 +1,13 @@
+import { isWebVacancy } from './web-scope.ts'
 import type { Vacancy } from '../src/lib/hh.ts'
+import { classifyMarket, marketRejectionNames } from '../src/lib/market-policy.ts'
 
-export const SELECTION_VERSION = 'curated-remote-v1'
-export type Rejection = 'office' | 'sales' | 'calls' | 'teaching' | 'closed' | 'no_description'
+export const SELECTION_VERSION = 'web-remote-v2'
+export type Rejection = 'office' | 'sales' | 'calls' | 'teaching' | 'closed' | 'no_description' | 'not_web' | 'communication' | 'russia_restricted' | 'seniority'
 export const rejectionNames: Record<Rejection, string> = {
   office: 'Без удалённого или гибридного формата', sales: 'Продажи', calls: 'Обзвоны и колл-центры',
   teaching: 'Преподавание и сопровождение обучения', closed: 'Закрытые вакансии', no_description: 'Нет полного описания',
+  ...marketRejectionNames, not_web: 'Не относится к вебу',
 }
 const clean = (text: string) => text.toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').replace(/[\u2010-\u2015]/g, '-').replace(/\s+/g, ' ').trim()
 const technicalSupport = /техподдерж|технич\S*\s+поддерж|поддерж\S*\s+(?:пользовател|по|программ|сервис|продукт)|(?:technical|customer)\s+support|help.?desk|service.?desk|клиентск\S*\s+сервис|customer\s+service/i
@@ -49,6 +52,8 @@ export function rejectionFor(vacancy: Vacancy, requireDescription = false): Reje
   if (activeDuty(body, /(?:выполнени[ея]|выполнять|обеспечивать)\s+(?:личн\S*\s+)?план\S*\s+(?:по\s+)?продаж|(?:активн\S*|прям\S*|холодн\S*)\s+продаж|допродаж|продавать\s+(?:услуг|товар|продукт|тариф|курс)|\b(?:upsell|cross[ -]?sell)\b|поиск\s+и\s+привлечение\s+(?:новых|потенциальных)\s+клиентов/,technical)) return 'sales'
   if (activeDuty(body, /(?:проводить|вести|проведение)\s+(?:индивидуальн\S*\s+)?(?:онлайн[ -]?)?(?:уроки|уроков|занятия|занятий)|(?:проверять|проверка)\s+домашни\S*\s+задани\S*|(?:обучать|обучение)\s+(?:учеников|школьников|студентов)|преподавать\s+(?:английский|немецкий|математику|программирование)|\b(?:conduct|teach)\s+(?:online\s+)?(?:lessons|classes)\b/,technical)) return 'teaching'
   if (requireDescription && clean(vacancy.description||'').length < 40) return 'no_description'
+  if (requireDescription && !isWebVacancy(vacancy)) return 'not_web'
+  if (requireDescription) return classifyMarket(vacancy).reason
   return null
 }
 

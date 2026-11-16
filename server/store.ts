@@ -13,12 +13,21 @@ import type { Rejection } from './selection.ts'
 import { classifyPriorities, priorityDirections } from '../src/lib/priorities.ts'
 import type { PriorityMatch } from '../src/lib/priorities.ts'
 import { candidateChanged, DETAIL_TTL, QUEUE_VERSION, queuePriority, REJECTION_TTL } from './collector-policy.ts'
+import { WorkspaceState } from './workspace-state.ts'
+import { recommendVacancy } from '../src/lib/recommendations.ts'
+import type { Recommendation, RecommendationKind } from '../src/lib/recommendations.ts'
+import { SourceState } from './source-state.ts'
+import { MarketState } from './market-state.ts'
+import { classifyMarket } from '../src/lib/market-policy.ts'
 
 export const titleTerms = (title: string) => extractSkills(title).map(item => item.name)
 const rankings = (rows: Record<string, unknown>[]): Ranking[] => rows.map(row => ({ id: String(row.id), name: String(row.name), count: Number(row.count), ...(row.collected != null ? { collected: Number(row.collected) } : {}), ...(row.updated_at ? { updatedAt: String(row.updated_at) } : {}) }))
 
 export class Store {
   db: DatabaseSync
+  workspace: WorkspaceState
+  sources: SourceState
+  marketPolicy: MarketState
   constructor(path: string) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true })
     this.db = new DatabaseSync(path, { timeout: 5000 })
@@ -51,6 +60,9 @@ export class Store {
       CREATE INDEX IF NOT EXISTS tasks_queue ON tasks(status,due,priority,id);
       CREATE INDEX IF NOT EXISTS tasks_priority ON tasks(status,priority,due,id);
     `)
+    this.workspace = new WorkspaceState(this.db)
+    this.sources = new SourceState(this.db)
+    this.marketPolicy = new MarketState(this.db)
     if (!this.count('SELECT count(*) count FROM vacancies') && !this.get('selectionVersion', '')) this.set('selectionVersion', SELECTION_VERSION)
   }
   get<T>(key: string, fallback: T): T {
@@ -72,6 +84,9 @@ export class Store {
     } catch (error) { this.db.exec('ROLLBACK'); throw error }
   }
   ingest(data: VacanciesResponse) {
+    const ownsTransaction = !this.db.isTransaction
+    if (ownsTransaction) this.db.exec('BEGIN IMMEDIATE')
+    try {
     const now = new Date().toISOString()
     const insert = this.db.prepare(`INSERT INTO vacancies VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
       payload=excluded.payload,name=excluded.name,search_text=excluded.search_text,area_id=excluded.area_id,area_name=excluded.area_name,
@@ -82,13 +97,21 @@ export class Store {
     const term = this.db.prepare('INSERT OR IGNORE INTO vacancy_terms VALUES (?,?)')
     const group = this.db.prepare('INSERT INTO vacancy_groups VALUES (?,?,?)')
     const mention = this.db.prepare('INSERT INTO vacancy_skills VALUES (?,?,?,?,?)')
-    const accepted = data.items.filter(item => {
+    const accepted = data.items.map(item => {
+      const id = this.sources.resolve(item)
+      const row = this.db.prepare('SELECT payload FROM vacancies WHERE id=?').get(id)
+      const previous = row ? JSON.parse(String(row.payload)) as Vacancy : null
+      if (previous && (previous.source?.id || 'hh') !== (item.source?.id || 'hh')) {
+        const previousDecision = classifyMarket(previous)
+        const previousLocations = previous.applicant_locations || (previousDecision.evidence.startsWith('География вакансии:') ? [previous.area.name] : undefined)
+        return { ...item, id, applicant_locations: item.applicant_locations ?? previousLocations, excluded_locations: item.excluded_locations ?? previous.excluded_locations }
+      }
+      return { ...item, id }
+    }).filter(item => {
       const reason = rejectionFor(item, true)
       if (reason) { this.reject(item.id, reason); return false }
       return true
     })
-    this.db.exec('BEGIN IMMEDIATE')
-    try {
       for (const item of accepted) {
         const salary = salaryOf(item)
         const lower = salary?.currency === 'RUR' && salary.mode?.id === 'MONTH' && salary.gross === false ? salary.from : null
@@ -104,14 +127,20 @@ export class Store {
           mention.run(item.id, value.name, value.category, value.source, value.evidence)
         }
         this.db.prepare('DELETE FROM rejected_ids WHERE id=?').run(item.id)
+        this.sources.register(item)
+        this.marketPolicy.record(item)
       }
       this.set('lastSuccess', now)
-      this.db.exec('COMMIT')
-    } catch (error) { this.db.exec('ROLLBACK'); throw error }
+      if (ownsTransaction) this.db.exec('COMMIT')
+    } catch (error) { if (ownsTransaction) this.db.exec('ROLLBACK'); throw error }
   }
   reject(id: string, reason: Rejection) {
-    for (const table of ['vacancy_roles','vacancy_formats','vacancy_terms','vacancy_groups','vacancy_skills']) this.db.prepare(`DELETE FROM ${table} WHERE vacancy_id=?`).run(id)
-    this.db.prepare('DELETE FROM vacancies WHERE id=?').run(id)
+    id = String(this.db.prepare('SELECT vacancy_id FROM vacancy_origins WHERE alias_key=?').get(`hh:${id}`)?.vacancy_id || id)
+    if (reason === 'communication' || reason === 'russia_restricted' || reason === 'seniority') this.marketPolicy.exclude(id, reason)
+    else {
+      for (const table of ['vacancy_roles','vacancy_formats','vacancy_terms','vacancy_groups','vacancy_skills','vacancy_market']) this.db.prepare(`DELETE FROM ${table} WHERE vacancy_id=?`).run(id)
+      this.db.prepare('DELETE FROM vacancies WHERE id=?').run(id)
+    }
     this.db.prepare('INSERT INTO rejected_ids VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET reason=excluded.reason,updated_at=excluded.updated_at').run(id, reason, new Date().toISOString())
   }
   market(kind: string, id: string, name: string, count: number) {
@@ -141,6 +170,7 @@ export class Store {
     catch (error) { this.db.exec('ROLLBACK'); throw error }
   }
   detailFresh(candidate: Vacancy) {
+    candidate = { ...candidate, id: this.sources.resolve(candidate) }
     const row = this.db.prepare('SELECT payload FROM vacancies WHERE id=?').get(candidate.id)
     if (row) {
       const saved = JSON.parse(String(row.payload))
@@ -212,14 +242,15 @@ export class Store {
   }
   analytics(filters: AnalyticsFilters): Analytics {
     const params: (string | number)[] = [Date.now() - Number(filters.period) * 86_400_000]
-    const parts = ['v.published>=?']
+    const activeClause = 'NOT EXISTS(SELECT 1 FROM vacancy_actions a WHERE a.vacancy_id=v.id) AND v.id IN (SELECT vacancy_id FROM vacancy_market WHERE eligible=1)'
+    const parts = ['v.published>=?', activeClause]
     const remote = true
     // Resolve remote IDs once per query, then use the vacancy primary key instead
     // of probing formats for every record in the 100k+ general market dataset.
     const remoteClause = filters.workFormat === 'REMOTE_ONLY' ? "v.id IN (SELECT vacancy_id FROM vacancy_formats WHERE name='Удалённо')" : "v.id IN (SELECT vacancy_id FROM vacancy_formats WHERE name IN ('Удалённо','Гибрид'))"
     const mixedClause = "EXISTS(SELECT 1 FROM vacancy_formats mf WHERE mf.vacancy_id=v.id AND mf.name<>'Удалённо')"
-    const availableRemote = remote ? this.count(`SELECT count(*) count FROM vacancies v WHERE v.published>=? AND ${remoteClause}${filters.workFormat === 'REMOTE_ONLY' ? ` AND NOT ${mixedClause}` : ''}`, [params[0]]) : 0
-    const mixedExcluded = filters.workFormat === 'REMOTE_ONLY' ? this.count(`SELECT count(*) count FROM vacancies v WHERE v.published>=? AND (v.id NOT IN (SELECT vacancy_id FROM vacancy_formats WHERE name='Удалённо') OR ${mixedClause})`, [params[0]]) : 0
+    const availableRemote = remote ? this.count(`SELECT count(*) count FROM vacancies v WHERE v.published>=? AND ${activeClause} AND ${remoteClause}${filters.workFormat === 'REMOTE_ONLY' ? ` AND NOT ${mixedClause}` : ''}`, [params[0]]) : 0
+    const mixedExcluded = filters.workFormat === 'REMOTE_ONLY' ? this.count(`SELECT count(*) count FROM vacancies v WHERE v.published>=? AND ${activeClause} AND (v.id NOT IN (SELECT vacancy_id FROM vacancy_formats WHERE name='Удалённо') OR ${mixedClause})`, [params[0]]) : 0
     if (remote) parts.push(remoteClause)
     if (filters.workFormat === 'REMOTE_ONLY') parts.push(`NOT ${mixedClause}`)
     if (filters.experience) { parts.push('v.experience=?'); params.push(experienceOptions.find(item => item.id === filters.experience)?.name || filters.experience) }
@@ -231,6 +262,16 @@ export class Store {
     if (filters.text) { parts.push("v.search_text LIKE ? ESCAPE '!'"); params.push(`%${filters.text.toLocaleLowerCase('ru-RU').replace(/[!%_]/g, '!$&')}%`) }
     if (filters.profession) { parts.push('EXISTS(SELECT 1 FROM vacancy_roles vr WHERE vr.vacancy_id=v.id AND vr.role_id=?)'); params.push(filters.profession) }
     if (filters.direction) { parts.push('EXISTS(SELECT 1 FROM vacancy_roles vr JOIN role_directions rd ON vr.role_id=rd.role_id WHERE vr.vacancy_id=v.id AND rd.direction_id=?)'); params.push(filters.direction) }
+    const recommendations = new Map<string, Recommendation>()
+    if (filters.recommendation) {
+      const candidates = this.db.prepare(`SELECT v.id,v.payload FROM vacancies v WHERE ${parts.join(' AND ')}`).all(...params)
+      for (const row of candidates) {
+        const decision = recommendVacancy(JSON.parse(String(row.payload)), filters.recommendation as RecommendationKind)
+        if (decision.matched) recommendations.set(String(row.id), decision)
+      }
+      parts.push('v.id IN (SELECT value FROM json_each(?))')
+      params.push(JSON.stringify([...recommendations.keys()]))
+    }
     let priority: Analytics['priority']
     const priorityMatches = new Map<string, PriorityMatch[]>()
     if (filters.priority) {
@@ -292,9 +333,11 @@ export class Store {
         descriptions: this.count(`SELECT count(*) count FROM vacancies v WHERE ${where} AND json_extract(v.payload,'$.detail_fetched_at') IS NOT NULL`,params),
       }
     }
-    const recent = this.db.prepare(`SELECT payload FROM vacancies v WHERE ${where} ORDER BY published DESC,v.id LIMIT ? OFFSET ?`).all(...params, pageSize, page * pageSize).map(row => JSON.parse(String(row.payload)))
+    const recent = this.db.prepare(`SELECT payload FROM vacancies v WHERE ${where} ORDER BY published DESC,v.id LIMIT ? OFFSET ?`).all(...params, pageSize, page * pageSize).map(row => { const job = JSON.parse(String(row.payload)); return { ...job, origins: this.sources.origins(job.id) } })
     if (priority) for (const vacancy of recent) priority.matches[vacancy.id] = priorityMatches.get(vacancy.id) || []
     return {
+      processedTotal: this.count('SELECT count(*) count FROM vacancy_actions'),
+      marketPolicy: this.marketPolicy.stats(),
       status: {
         enabled: this.get('enabled', true), running: this.get('running', false) && this.get('lease', { until: 0 }).until > Date.now(),
         current: this.get('current', ''), lastError: this.get('lastError', null), nextAt: this.get('nextAt', 0),
@@ -330,8 +373,9 @@ export class Store {
         spokenLanguages: group('s.name','s.name',"JOIN vacancy_skills s ON s.vacancy_id=v.id AND s.category='human_language'"),
         daily: group('substr(v.first_seen,1,10)', 'substr(v.first_seen,1,10)').sort((a, b) => a.id.localeCompare(b.id)),
       },
-      options: { professions: taxonomy.roles.map(({ id, name }) => ({ id, name })), directions: taxonomy.directions.map(({ id, name }) => ({ id, name })), groups: this.db.prepare('SELECT group_id id,name FROM vacancy_groups GROUP BY group_id ORDER BY name').all().map(row => ({ id: String(row.id),name: String(row.name) })) },
+      options: { professions: taxonomy.roles.map(({ id, name }) => ({ id, name })), directions: taxonomy.directions.map(({ id, name }) => ({ id, name })), groups: this.db.prepare('SELECT group_id id,name FROM vacancy_groups WHERE vacancy_id IN (SELECT vacancy_id FROM vacancy_market WHERE eligible=1) GROUP BY group_id ORDER BY name').all().map(row => ({ id: String(row.id),name: String(row.name) })) },
       recent,
+      ...(filters.recommendation ? { recommendations: Object.fromEntries(recent.map(vacancy => [vacancy.id, recommendations.get(vacancy.id)!])) } : {}),
       ...(priority ? { priority } : {}),
       ...(remoteDetails ? { remote: remoteDetails } : {}),
     }

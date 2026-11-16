@@ -9,7 +9,7 @@ function job(id, options = {}) {
     id: String(id), name: options.name || 'Python-разработчик',
     employer: { id: `company-${id}`, name: 'Компания' }, area: { id: '1', name: 'Москва' },
     role_ids: ['1'], published_at: new Date().toISOString(),
-    description: 'Разработка и сопровождение программных продуктов. Работа с технической документацией и командой.', detail_fetched_at:new Date().toISOString(),
+    description: 'Разработка и сопровождение веб-сервисов. Работа с технической документацией и командой.', detail_fetched_at:new Date().toISOString(),
     experience: options.noExperience ? { id: 'noExperience', name: 'Нет опыта' } : { id: 'between1And3', name: 'От 1 года до 3 лет' },
     salary_range: { from: options.salary ?? 100000, to: null, currency: 'RUR', gross: false, mode: { id: 'MONTH', name: 'За месяц' } },
     work_format: (options.formats || ['REMOTE']).map(id => ({ id, name: formats[id] })),

@@ -9,13 +9,8 @@ import { Collector } from '../server/collector.ts'
 import { defaultRemoteFilters } from '../src/lib/analytics.ts'
 import { taskUrl, moscowDay, shiftDay } from '../server/crawl-plan.ts'
 
-const description='Разработка и сопровождение программных продуктов. Работа с документацией, согласование задач с командой.'
+const description='Разработка и сопровождение веб-сервисов. Работа с документацией, согласование задач с командой.'
 const job=(name,body=description,format='REMOTE')=>({ id:'101',name,description:body,detail_fetched_at:new Date().toISOString(),published_at:new Date().toISOString(),employer:{id:'1',name:'Компания'},area:{id:'1',name:'Москва'},work_format:[{id:format,name:format==='HYBRID'?'Гибрид':'Удалённо'}],role_ids:['96'] })
-
-test('selection keeps non-sales managers, SMM, designers and technical support, not just IT',()=>{
-  for(const title of ['Менеджер проектов','Product manager','SMM-специалист','Менеджер клиентского сервиса','Техническая поддержка','Оператор технической поддержки колл-центра','Бухгалтер','Дизайнер','Аналитик продаж','Разработчик CRM для отдела продаж','Backend-разработчик онлайн-школы']) assert.equal(rejectionFor(job(title),true),null,title)
-  assert.equal(rejectionFor(job('SMM-менеджер',description,'HYBRID'),true),null)
-})
 
 test('selection rejects sales, outbound calls, call centers, teaching and pure office work',()=>{
   for(const title of ['Менеджер по продажам','Sales manager','SDR','Продавец-консультант','Оператор колл-центра','Телемаркетолог','Учитель английского','Онлайн-преподаватель','Репетитор','Куратор онлайн-курсов','Методист']) assert.notEqual(rejectionFor(job(title),true),null,title)
@@ -28,15 +23,15 @@ test('full descriptions uncover disguised sales and calls without rejecting expl
   assert.equal(rejectionFor(job(support,'Предстоит совершать исходящие звонки и помогать клиентам настроить программу.'),true),'calls')
   assert.equal(rejectionFor(job(support,'В обязанности входит выполнение личного плана продаж услуг и работа с обращениями.'),true),'sales')
   assert.equal(rejectionFor(job(support,'Help users and perform outbound calls every day to prospective customers.'),true),'calls')
-  for(const text of ['Работа без холодных звонков и без активных продаж. Помогаем пользователям настроить программу.','У нас нет исходящих звонков. Решаем технические вопросы по входящим обращениям пользователей.','No cold calls. Help users configure software and troubleshoot technical issues.']) assert.equal(rejectionFor(job(support,text),true),null,text)
+  for(const text of ['Работа без холодных звонков и без активных продаж. Помогаем пользователям настроить веб-сервис.','У нас нет исходящих звонков. Решаем технические вопросы веб-сервисов по входящим обращениям пользователей.','No cold calls. Help users configure web software and troubleshoot technical issues. Russian-speaking team.']) assert.equal(rejectionFor(job(support,text),true),null,text)
   assert.equal(rejectionFor(job('Ассистент','Предстоит проводить онлайн-занятия и проверять домашние задания по программированию.'),true),'teaching')
-  assert.equal(rejectionFor(job('Аналитик', 'Мы анализируем воронку продаж и строим отчеты в SQL. Никаких звонков клиентам.'),true),null)
+  assert.equal(rejectionFor(job('Аналитик', 'Мы анализируем воронку продаж и строим отчеты в SQL. Никаких звонков клиентам.'),true),'not_web')
   assert.equal(rejectionFor(job('Affiliate Manager','Навыки продаж: умеете выявлять потребность, презентовать предложение и работать с возражениями.'),true),'sales')
   assert.equal(rejectionFor(job('Менеджер по работе с клиентами','Обязанности:\nПродажа услуг и консультирование по тарифным планам.\nУсловия:\nУдалённая работа.'),true),'sales')
   assert.equal(rejectionFor(job('Наставник','Обязанности:\nПроведение индивидуальных онлайн-занятий. Проверка домашних заданий.\nУсловия:\nРабота из дома.'),true),'teaching')
-  assert.equal(rejectionFor(job('Менеджер по персоналу','Вести подбор менеджеров по продажам. Знание коммерческого бизнеса поможет проводить интервью с кандидатами.'),true),null)
-  assert.equal(rejectionFor(job('Python-разработчик','Разрабатываем платформу, которая позволяет проводить онлайн-занятия. Обязанности:\nРазрабатывать API и исправлять ошибки в коде.'),true),null)
-  assert.equal(rejectionFor(job('Backend developer','Наш сервис позволяет совершать исходящие звонки и поддерживает голосовых роботов.\nОбязанности:\nРазработка API на Python.\nТребования:\nЗнание SQL.'),true),null)
+  assert.equal(rejectionFor(job('Менеджер по персоналу','Вести подбор менеджеров по продажам. Знание коммерческого бизнеса поможет проводить интервью с кандидатами.'),true),'not_web')
+  assert.equal(rejectionFor(job('Python-разработчик','Разрабатываем платформу, которая позволяет проводить онлайн-занятия. Обязанности:\nРазрабатывать веб API и исправлять ошибки в коде.'),true),null)
+  assert.equal(rejectionFor(job('Backend developer','Наш сервис позволяет совершать исходящие звонки и поддерживает голосовых роботов.\nОбязанности:\nРазработка веб API на Python.\nТребования:\nЗнание SQL.'),true),null)
 })
 
 test('title dictionary merges synonyms and seniority but keeps distinct functions separate',()=>{
@@ -74,7 +69,7 @@ test('detail parser verifies IDs, strips HTML/scripts and retains skills and wor
 
 test('storage enforces selection and grouped-title filters, updates skills and removes reclassified sales',t=>{
   const store=new Store(':memory:');t.after(()=>store.close())
-  store.ingest({items:[job('Менеджер по продажам'),job('Frontend developer','Создание интерфейсов на React, JavaScript и TypeScript. Работа в команде и анализ требований.'),{...job('Senior Frontend-разработчик'),id:'102'}]})
+  store.ingest({items:[job('Менеджер по продажам'),job('Frontend developer','Создание интерфейсов на React, JavaScript и TypeScript. Работа в команде и анализ требований.'),{...job('Middle Frontend-разработчик'),id:'102'}]})
   let stats=store.analytics(defaultRemoteFilters)
   assert.equal(stats.totals.stored,2)
   assert.equal(stats.remote.groups.length,1)

@@ -1,3 +1,4 @@
+import { isWebCandidate } from './web-scope.ts'
 import { randomUUID } from 'node:crypto'
 import { HhPageError, parseSearchPage } from './hh-page.ts'
 import { Store } from './store.ts'
@@ -8,15 +9,17 @@ import { parseVacancyDetail } from './hh-detail.ts'
 import { rejectionFor, SELECTION_VERSION, skipProfession } from './selection.ts'
 import { DISCOVERY_INTERVAL, MIN_INTERVAL, QUEUE_VERSION, responseDiagnostic, responsePreview, retryAfterMs, searchPlan } from './collector-policy.ts'
 import type { ResponseDiagnostic } from './collector-policy.ts'
+import { SourceRunner } from './source-runner.ts'
 
 export class Collector {
   store: Store
+  sources: SourceRunner
   private owner = randomUUID()
   private stopped = false
   private timer: ReturnType<typeof setTimeout> | undefined
   private active: Promise<void> | undefined
-  constructor(path: string) { this.store = new Store(path) }
-  start() { this.schedule(0) }
+  constructor(path: string) { this.store = new Store(path); this.sources = new SourceRunner(this.store) }
+  start() { this.sources.start(); this.schedule(0) }
   private schedule(delay: number) {
     if (this.stopped) return
     clearTimeout(this.timer)
@@ -49,6 +52,8 @@ export class Collector {
     return delay
   }
   private success() {
+    this.store.set('hhLastSuccess', new Date().toISOString())
+    this.store.sources.event('hh', `Запрос выполнен: ${this.store.get('current', '')}`)
     this.store.set('lastError', null)
     this.store.set('blockStreak', 0)
     this.store.set('blockedUntil', 0)
@@ -58,7 +63,7 @@ export class Collector {
   }
   async tick() {
     if (this.stopped) return
-    if (!this.store.get('enabled', true) || !this.store.lease(this.owner)) { this.schedule(3000); return }
+    if (!this.store.get('enabled', true) || !this.store.get('hhEnabled', true) || !this.store.lease(this.owner)) { this.schedule(3000); return }
     if (this.store.get<string>('selectionVersion', '') !== SELECTION_VERSION) {
       this.store.set('enabled', false)
       this.store.set('lastError', 'База использует прежние правила. Для разрешённого обнуления запустите npm run reset-data.')
@@ -138,7 +143,7 @@ export class Collector {
       }
       const details: CrawlTask[] = []
       for (const vacancy of data.items) {
-        const reason = rejectionFor(vacancy)
+        const reason = rejectionFor(vacancy) || (!isWebCandidate(vacancy) ? 'not_web' : null)
         if (reason) this.store.reject(vacancy.id, reason)
         else details.push({ ...task, kind: 'detail', label: `Описание: ${vacancy.name}`, candidate: vacancy, page: 0 })
       }
@@ -152,6 +157,7 @@ export class Collector {
       if (this.stopped) return
       const taskDelay = Math.max(delay, Math.min(30 * 60_000, 60_000 * 2 ** entry.attempts))
       this.store.set('lastError', error instanceof Error ? error.message : String(error))
+      this.store.sources.event('hh', this.store.get('lastError', ''), 'error')
       this.store.db.prepare('UPDATE tasks SET attempts=attempts+1,due=?,status=? WHERE id=?').run(Date.now() + taskDelay, entry.attempts >= 5 ? 'failed' : 'pending', entry.id)
     } finally {
       if (!this.stopped) { this.store.set('running', false); this.store.set('nextAt', Date.now() + delay); this.schedule(delay) }
@@ -165,6 +171,7 @@ export class Collector {
     this.stopped = true
     clearTimeout(this.timer)
     await this.active
+    await this.sources.close()
     this.store.release(this.owner)
     this.store.close()
   }
