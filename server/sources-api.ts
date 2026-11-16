@@ -18,7 +18,7 @@ export async function sourcesApi(req: IncomingMessage, res: ServerResponse, url:
       const hh: SourceTrack = {
         id: 'hh', name: 'hh.ru', color: '#d84750', note: 'Удалёнка и гибрид; веб-разработка и технические роли', enabled, running,
         phase: !enabled ? 'paused' : running ? 'running' : lastError ? 'error' : 'waiting', current: store.get('current', ''),
-        nextAt: Math.max(store.get('nextAt', 0), store.get('blockedUntil', 0)), lastSuccess: store.get('hhLastSuccess', store.get('lastSuccess', null)), lastError, lastStatus: failure?.status ?? null,
+        nextAt: Math.max(store.get('nextAt', 0), store.get('blockedUntil', 0)), lastSuccess: store.get('hhLastSuccess', store.get('lastSuccess', null)), lastError, lastStatus: lastError ? failure?.status ?? null : null,
         requests: store.get('requests', 0), saved: store.count("SELECT count(*) count FROM vacancies WHERE json_extract(payload,'$.source.id') IS NULL OR json_extract(payload,'$.source.id')='hh'"),
         duplicates: store.get('cacheSkipped', 0), rejected: store.count('SELECT count(*) count FROM rejected_ids'), pending: store.taskStats().pending, boards: 0,
       }

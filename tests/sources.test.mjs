@@ -14,8 +14,9 @@ import { sourceDefinitions } from '../src/lib/sources.ts'
 import { defaultRemoteFilters } from '../src/lib/analytics.ts'
 import { formatSalary } from '../src/lib/hh.ts'
 import { recommendDevelopment } from '../src/lib/recommendations.ts'
+import { retiredSourceFixtures } from './fixtures/retired-sources.mjs'
 
-const definition = id => sourceDefinitions.find(source => source.id === id)
+const definition = id => sourceDefinitions.find(source => source.id === id) || retiredSourceFixtures.find(source => source.id === id)
 const description = 'Develop React and TypeScript web interfaces. Collaborate with the product team, maintain existing applications and improve their accessibility. This position is fully remote. Russian-speaking team.'
 const job = (id = '1', extra = {}) => ({
   id, name: 'Frontend developer', alternate_url: `https://hh.ru/vacancy/${id}`,
@@ -44,7 +45,7 @@ test('board discovery and task fetching cannot recurse into hh, private hosts or
   for (const url of ['http://127.0.0.1/jobs', 'https://localhost/', 'https://jobs.ashbyhq.com.evil.example/company', 'https://hh.ru/vacancy/123']) assert.equal(boardFromUrl(url), null)
   assert.equal(boardFromUrl('https://jobs.ashbyhq.com/example/abc?utm_source=google').url, 'https://api.ashbyhq.com/posting-api/job-board/example')
   assert.equal(boardFromUrl('https://job-boards.greenhouse.io/example/jobs/123').source, 'greenhouse')
-  assert.equal(boardFromUrl('https://jobs.eu.lever.co/example').url, 'https://api.eu.lever.co/v0/postings/example?mode=json')
+  assert.equal(boardFromUrl('https://jobs.eu.lever.co/example').url, 'https://api.eu.lever.co/v0/postings/example?mode=json&limit=1&skip=0')
   for (const url of ['https://hh.ru/vacancy/1', 'https://api.ashbyhq.com.evil.example/x', 'http://api.ashbyhq.com/x', 'https://api.ashbyhq.com:444/x', 'https://user:secret@api.ashbyhq.com/x']) assert.equal(allowedSourceUrl(definition('ashby'), url), false)
 })
 
@@ -193,10 +194,10 @@ test('source leases are shared between processes, limited to three and paced by 
   assert.ok(first.sources.claim('geekjob', 'one'))
   assert.equal(second.sources.claim('ashby', 'two'), null)
   first.db.exec("UPDATE source_state SET lease_until=0; DELETE FROM source_hosts")
-  first.sources.enqueue('tg-react', definition('tg-react').url, 'feed')
-  first.sources.enqueue('tg-frontend', definition('tg-frontend').url, 'feed')
-  assert.ok(first.sources.claim('tg-react', 'one'))
-  assert.equal(second.sources.claim('tg-frontend', 'two'), null)
+  first.sources.enqueue('ashby', 'https://api.ashbyhq.com/posting-api/job-board/another', 'board')
+  assert.ok(first.sources.claim('ashby', 'one'))
+  first.db.prepare("UPDATE source_state SET lease_until=0 WHERE id='ashby'").run()
+  assert.equal(second.sources.claim('ashby', 'two'), null, 'A released lease must still respect the shared host pace')
 })
 
 test('rediscovery does not reset retries, and restarting preserves tasks, source pause and events', t => {
@@ -242,11 +243,11 @@ test('endpoint changes retry fixed HTTP 200 parse errors while preserving access
   store.set('enabled', false)
   const later = Date.now() + 3600000
   store.db.prepare("UPDATE source_state SET next_at=?,last_status=200,last_error='Old page schema' WHERE id='getmatch'").run(later)
-  store.db.prepare("UPDATE source_state SET next_at=?,last_status=403,last_error='Access denied' WHERE id='remotive'").run(later)
+  store.db.prepare("UPDATE source_state SET next_at=?,last_status=403,last_error='Access denied' WHERE id='wwr'").run(later)
   store.db.prepare("UPDATE source_state SET next_at=?,last_status=200,last_error='Источник запросил проверку доступа / капчу' WHERE id='habr'").run(later)
   runner.start()
   assert.equal(store.db.prepare("SELECT next_at FROM source_state WHERE id='getmatch'").get().next_at, 0)
-  assert.equal(store.db.prepare("SELECT next_at FROM source_state WHERE id='remotive'").get().next_at, later)
+  assert.equal(store.db.prepare("SELECT next_at FROM source_state WHERE id='wwr'").get().next_at, later)
   assert.equal(store.db.prepare("SELECT next_at FROM source_state WHERE id='habr'").get().next_at, later)
   store.db.prepare("UPDATE source_state SET next_at=? WHERE id='getmatch'").run(later)
   runner.start()

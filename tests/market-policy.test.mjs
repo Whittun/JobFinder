@@ -166,8 +166,8 @@ test('merging a Russian duplicate cannot erase known country restrictions from t
 })
 
 test('API and JSON-LD adapters preserve explicit candidate geography separately from a company city', () => {
-  const source = sourceDefinitions.find(item => item.id === 'himalayas')
-  const out = parseSource(source, JSON.stringify({ jobs: [{ title: 'Frontend developer', description: russian, guid: 'https://himalayas.app/companies/example/jobs/frontend', companyName: 'Example', locationRestrictions: ['United States'], timezoneRestrictions: ['UTC-5'] }] }), { id: 1, kind: 'feed', url: source.url, context: {} })
+  const source = sourceDefinitions.find(item => item.id === 'wwr')
+  const out = parseSource(source, `<rss><channel><item><title>Example: Frontend developer</title><link>https://weworkremotely.com/remote-jobs/example</link><description><![CDATA[${russian}]]></description><country>United States</country></item></channel></rss>`, { id: 1, kind: 'feed', url: source.url, context: {} })
   assert.deepEqual(out.jobs[0].applicant_locations, ['United States'])
   assert.equal(classifyMarket(out.jobs[0]).reason, 'russia_restricted')
   const habr = sourceDefinitions.find(item => item.id === 'habr')

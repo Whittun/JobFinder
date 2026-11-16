@@ -36,7 +36,10 @@ export class SourceRunner {
         this.store.set(`sourceEndpoint:${source.id}`, source.url)
       }
       const board = boardFromUrl(source.url)
-      if (board) this.addBoard(source.url)
+      if (board) {
+        for (const row of this.store.db.prepare('SELECT url FROM source_boards WHERE source_id=?').all(source.id)) this.addBoard(String(row.url))
+        this.addBoard(source.url)
+      }
       else if (source.kind === 'search') {
         const queries = ['site:jobs.ashbyhq.com web Russian remote']
         this.store.db.prepare("UPDATE source_tasks SET status='superseded' WHERE source_id='search' AND kind='search' AND json_extract(context,'$.query') NOT IN (SELECT value FROM json_each(?))").run(JSON.stringify(queries))
@@ -48,6 +51,19 @@ export class SourceRunner {
   addBoard(value: string) {
     const board = boardFromUrl(value)
     if (!board) throw new Error('Поддерживаются карьерные страницы Ashby, Greenhouse и Lever.')
+    if (!sourceDefinitions.some(source => source.id === board.source)) throw new Error('Этот источник удалён из сборщика.')
+    board.url = new URL(board.url).href
+    // Retire old bulk endpoints and case aliases without touching job provenance or personal marks.
+    for (const row of this.store.db.prepare('SELECT url FROM source_boards WHERE source_id=?').all(board.source)) {
+      if (boardFromUrl(String(row.url))?.url === board.url && String(row.url) !== board.url) this.store.db.prepare('DELETE FROM source_boards WHERE source_id=? AND url=?').run(board.source, row.url)
+    }
+    for (const row of this.store.db.prepare("SELECT id,url FROM source_tasks WHERE source_id=? AND kind='board' AND status!='superseded'").all(board.source)) {
+      if (boardFromUrl(String(row.url))?.url === board.url && new URL(String(row.url)).href !== new URL(board.url).href) {
+        const current = new URL(String(row.url)); current.searchParams.sort()
+        const target = new URL(board.url); target.searchParams.sort()
+        if (current.href !== target.href) this.store.db.prepare("UPDATE source_tasks SET status='superseded' WHERE id=?").run(row.id)
+      }
+    }
     const exists = this.store.db.prepare('SELECT 1 FROM source_boards WHERE source_id=? AND url=?').get(board.source, board.url)
     if (!exists && this.store.count('SELECT count(*) count FROM source_boards') >= 500) throw new Error('Достигнут лимит 500 карьерных страниц.')
     this.store.db.prepare('INSERT OR IGNORE INTO source_boards VALUES (?,?,?)').run(board.source, board.url, board.label)
@@ -83,6 +99,7 @@ export class SourceRunner {
       if (!allowedSourceUrl(source, task.url)) throw new Error('Адрес задачи не входит в разрешённые домены источника')
       const search = source.kind === 'search'
       const headers: Record<string, string> = { 'User-Agent': 'JobFinder/0.2', Accept: 'application/json,text/html,application/rss+xml,application/xml', 'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.7' }
+      if (source.kind === 'lever') headers['Accept-Encoding'] = 'identity'
       if (search) { headers['X-API-KEY'] = process.env.SERPER_API_KEY!; headers['Content-Type'] = 'application/json' }
       const cached = db.prepare('SELECT etag,last_modified FROM source_http_cache WHERE url=?').get(task.url)
       if (cached?.etag) headers['If-None-Match'] = String(cached.etag)

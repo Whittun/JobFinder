@@ -49,6 +49,7 @@ export function boardFromUrl(value: string): { source: string; url: string; labe
   if (['boards.greenhouse.io', 'job-boards.greenhouse.io', 'boards-api.greenhouse.io'].includes(url.hostname)) { source = 'greenhouse'; slug = url.hostname === 'boards-api.greenhouse.io' ? parts[2] : parts[0] }
   if (['jobs.lever.co', 'jobs.eu.lever.co', 'api.lever.co', 'api.eu.lever.co'].includes(url.hostname)) { source = 'lever'; slug = url.hostname.startsWith('api.') ? parts[2] : parts[0] }
   if (!/^[a-z0-9][a-z0-9_-]{0,90}$/i.test(slug || '') || !source) return null
-  const endpoint = source === 'ashby' ? `https://api.ashbyhq.com/posting-api/job-board/${slug}` : source === 'greenhouse' ? `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs?content=true` : `https://${url.hostname.includes('.eu.') ? 'api.eu.lever.co' : 'api.lever.co'}/v0/postings/${slug}?mode=json`
+  slug = slug.toLowerCase()
+  const endpoint = source === 'ashby' ? `https://api.ashbyhq.com/posting-api/job-board/${slug}` : source === 'greenhouse' ? `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs` : `https://${url.hostname.includes('.eu.') ? 'api.eu.lever.co' : 'api.lever.co'}/v0/postings/${slug}?mode=json&limit=1&skip=0`
   return { source, url: endpoint, label: slug }
 }

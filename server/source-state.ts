@@ -6,6 +6,13 @@ import { digest, identityKeys, normalizeUrl, originalIdentity } from './source-i
 import { rejectionFor } from './selection.ts'
 
 export type SourceTask = { id: number; source: string; url: string; kind: string; attempts: number; context: Record<string, unknown> }
+const retiredReasons: Record<string, string> = {
+  himalayas: 'Удалён из сборщика: публичный API недоступен с этой машины (ECONNRESET).',
+  remotive: 'Удалён из сборщика: API и XML-ленты возвращают HTTP 403.',
+  remoteok: 'Удалён из сборщика: JSON-ответы обрываются по таймауту; RSS возвращает HTTP 410.',
+  'tg-react': 'Удалён из сборщика: публичная Telegram-лента недоступна (CONNECT_TIMEOUT); API требует отдельной авторизации.',
+  'tg-frontend': 'Удалён из сборщика: публичная Telegram-лента недоступна (CONNECT_TIMEOUT); API требует отдельной авторизации.',
+}
 export class SourceState {
   db: DatabaseSync
   constructor(db: DatabaseSync) {
@@ -22,6 +29,11 @@ export class SourceState {
       CREATE TABLE IF NOT EXISTS source_events (id INTEGER PRIMARY KEY,source_id TEXT NOT NULL,at TEXT NOT NULL,level TEXT NOT NULL,message TEXT NOT NULL);
     `)
     for (const source of sourceDefinitions) db.prepare('INSERT OR IGNORE INTO source_state(id) VALUES (?)').run(source.id)
+    const active = JSON.stringify(sourceDefinitions.map(source => source.id))
+    for (const row of db.prepare('SELECT id FROM source_state WHERE id NOT IN (SELECT value FROM json_each(?)) AND enabled=1').all(active)) this.event(String(row.id), retiredReasons[String(row.id)] || 'Источник больше не используется; очередь остановлена.', 'info')
+    db.prepare("UPDATE source_state SET enabled=0,lease_owner='',lease_until=0 WHERE id NOT IN (SELECT value FROM json_each(?))").run(active)
+    db.prepare("UPDATE source_tasks SET status='retired' WHERE source_id NOT IN (SELECT value FROM json_each(?)) AND status!='retired'").run(active)
+    db.prepare('DELETE FROM source_boards WHERE source_id NOT IN (SELECT value FROM json_each(?))').run(active)
   }
   event(source: string, message: string, level = 'info') {
     this.db.prepare('INSERT INTO source_events(source_id,at,level,message) VALUES (?,?,?,?)').run(source, new Date().toISOString(), level, message.slice(0, 800))
@@ -57,12 +69,14 @@ export class SourceState {
     return this.db.prepare("SELECT source_id,url FROM vacancy_origins WHERE vacancy_id=? AND alias_key LIKE 'origin:%' GROUP BY source_id,url ORDER BY source_id").all(id).map(row => ({ source: String(row.source_id), name: row.source_id === 'hh' ? 'hh.ru' : sourceDefinitions.find(source => source.id === row.source_id)?.name || String(row.source_id), url: String(row.url) }))
   }
   enqueue(source: string, value: string, kind: string, context: Record<string, unknown> = {}, due = 0) {
+    if (!sourceDefinitions.some(item => item.id === source)) return
     const url = normalizeUrl(value)
     if (!url) return
     this.db.prepare(`INSERT INTO source_tasks(source_id,url,kind,context,due) VALUES (?,?,?,?,?) ON CONFLICT(source_id,url) DO UPDATE SET status=CASE WHEN source_tasks.status IN ('done','failed') AND source_tasks.checked_at<? THEN 'pending' ELSE source_tasks.status END,due=CASE WHEN source_tasks.status IN ('done','failed') AND source_tasks.checked_at<? THEN excluded.due ELSE source_tasks.due END,context=excluded.context`).run(source, url, kind, JSON.stringify(context), due, Date.now() - 3*86400000, Date.now() - 3*86400000)
   }
   claim(source: string, owner: string): SourceTask | null {
-    const definition = sourceDefinitions.find(item => item.id === source)!
+    const definition = sourceDefinitions.find(item => item.id === source)
+    if (!definition) return null
     const now = Date.now()
     this.db.exec('BEGIN IMMEDIATE')
     try {

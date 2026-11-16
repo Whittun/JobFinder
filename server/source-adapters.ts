@@ -3,7 +3,7 @@ import type { Vacancy, Named, Salary } from '../src/lib/hh.ts'
 import type { SourceDefinition } from '../src/lib/sources.ts'
 import type { SourceTask } from './source-state.ts'
 import { boardFromUrl, digest, normalizeUrl, originalIdentity } from './source-identity.ts'
-import { isExcludedWebTitle } from './web-scope.ts'
+import { isExcludedWebTitle, isWebCandidate } from './web-scope.ts'
 
 type Obj = Record<string, unknown>
 const object = (value: unknown): Obj => value && typeof value === 'object' && !Array.isArray(value) ? value as Obj : {}
@@ -84,16 +84,28 @@ export function allowedSourceUrl(source: SourceDefinition, value: string) {
 function parseJson(source: SourceDefinition, body: string, task: SourceTask): AdapterResult {
   const out = result(), json: unknown = JSON.parse(body), root = object(json)
   let jobs: unknown[]
-  if (source.id === 'remoteok' || source.kind === 'lever') { if (!Array.isArray(json)) throw new Error('Изменилась схема JSON-ленты'); jobs = json }
+  if (source.kind === 'greenhouse' && task.kind === 'detail') { if (!root.id || typeof root.content !== 'string') throw new Error('В карточке Greenhouse отсутствует полное описание'); jobs = [root] }
+  else if (source.id === 'remoteok' || source.kind === 'lever') { if (!Array.isArray(json)) throw new Error('Изменилась схема JSON-ленты'); jobs = json }
   else { if (!Array.isArray(root.jobs)) throw new Error('В JSON-ответе отсутствует массив jobs'); jobs = root.jobs }
   for (const raw of jobs) {
     const item = object(raw)
+    if (source.kind === 'greenhouse' && task.kind !== 'detail' && !item.content) {
+      const title = str(item.title)
+      if (/^\d+$/.test(str(item.id)) && !isExcludedWebTitle(title) && isWebCandidate({ name: title })) {
+        const url = new URL(task.url); url.search = ''; url.pathname += `/${item.id}`
+        out.links.push({ url: url.href, kind: 'detail', context: { board: task.context.board } })
+      }
+      continue
+    }
     let input: JobInput | null = null
     if (source.id === 'himalayas') input = { title: str(item.title), description: str(item.description), url: str(item.guid || item.applicationLink), originalUrl: str(item.applicationLink) || undefined, nativeId: str(item.id || item.guid), company: str(item.companyName), location: [...array(item.locationRestrictions), ...array(item.timezoneRestrictions)].map(str).join(', ') || 'Worldwide', date: str(item.pubDate) ? new Date(Number(item.pubDate)*1000).toISOString() : str(item.publishedAt), remote: true, salaryText: str(item.salary), skills: [...array(item.categories), ...array(item.seniority)].map(str) }
     else if (source.id === 'remotive') input = { title: str(item.title), description: str(item.description), url: str(item.url), nativeId: str(item.id), company: str(item.company_name), location: str(item.candidate_required_location), date: str(item.publication_date), remote: true, salaryText: str(item.salary), skills: array(item.tags).map(str) }
     else if (source.id === 'remoteok' && item.id) input = { title: str(item.position), description: str(item.description), url: str(item.url), nativeId: str(item.id), company: str(item.company), location: str(item.location) || 'География — в описании', date: str(item.date), remote: true, salaryText: item.salary_min ? `${item.salary_min}–${item.salary_max || '…'} ${str(item.salary_currency)} (период — в оригинале)` : '', skills: array(item.tags).map(str) }
     else if (source.kind === 'ashby' && item.isListed !== false) input = { title: str(item.title), description: str(item.descriptionHtml || item.descriptionPlain), url: str(item.jobUrl), originalUrl: str(item.applyUrl) || undefined, nativeId: str(item.id), company: str(task.context.board || new URL(task.url).pathname.split('/').at(-1)), location: [str(item.location), str(object(object(item.address).postalAddress).addressCountry)].filter(Boolean).join(' · '), date: str(item.publishedAt), remote: item.isRemote === true || item.workplaceType === 'Remote' ? true : str(item.workplaceType) }
-    else if (source.kind === 'greenhouse') input = { title: str(item.title), description: str(item.content), url: str(item.absolute_url), nativeId: str(item.id), company: str(task.context.board || new URL(task.url).pathname.split('/')[3]), location: str(object(item.location).name), date: str(item.first_published || item.updated_at), formatsText: str(object(item.location).name) }
+    else if (source.kind === 'greenhouse') {
+      const content = str(item.content)
+      input = { title: str(item.title), description: /&lt;\/?(?:p|div|h[1-6]|ul|li|br|strong)\b/iu.test(content) ? load(content).root().text() : content, url: str(item.absolute_url), nativeId: str(item.id), company: str(item.company_name || task.context.board || new URL(task.url).pathname.split('/')[3]), location: str(object(item.location).name), date: str(item.first_published || item.updated_at), formatsText: str(object(item.location).name) }
+    }
     else if (source.kind === 'lever') { const categories = object(item.categories); input = { title: str(item.text), description: `${str(item.description)}\n${array(item.lists).map(value => { const section = object(value); return `<h3>${str(section.text)}</h3>${str(section.content)}` }).join('\n')}\n${str(item.additional)}`, url: str(item.hostedUrl), originalUrl: str(item.applyUrl) || undefined, nativeId: str(item.id), company: str(task.context.board || new URL(task.url).pathname.split('/')[3]), location: str(categories.location), date: item.createdAt ? new Date(Number(item.createdAt)).toISOString() : '', remote: str(item.workplaceType), formatsText: str(categories.location) } }
     if (input) {
       if (source.id === 'himalayas') input.applicantLocations = array(item.locationRestrictions).map(named)
@@ -107,7 +119,14 @@ function parseJson(source: SourceDefinition, body: string, task: SourceTask): Ad
     const next = new URL(source.url); next.searchParams.set('cursor', str(root.nextCursor))
     out.links.push({ url: next.href, kind: 'feed', context: { depth: Number(task.context.depth || 0)+1, recurring: false } })
   }
-  out.message = `${jobs.length} записей получено, ${out.jobs.length} полных карточек`
+  if (source.kind === 'lever') {
+    const next = new URL(task.url), limit = Number(next.searchParams.get('limit')), skip = Number(next.searchParams.get('skip') || 0)
+    if (Number.isInteger(limit) && limit > 0 && jobs.length === limit && Number.isInteger(skip) && skip >= 0 && skip + limit < 1000) {
+      next.searchParams.set('skip', String(skip + limit))
+      out.links.push({ url: next.href, kind: 'page', context: { board: task.context.board, recurring: true } })
+    }
+  }
+  out.message = `${jobs.length} записей получено, ${out.jobs.length} полных карточек${out.links.length ? `, ${out.links.length} заданий добавлено` : ''}`
   return out
 }
 function parseRss(source: SourceDefinition, body: string) {
