@@ -1,67 +1,69 @@
-# JobFinder — работа в вебе
+[Русская версия](README.ru.md)
 
-Локальный инструмент поиска и аналитики удалённой работы: веб-разработка, вёрстка, поддержка веб-сервисов, QA, инфраструктура, веб-дизайн, техническая аналитика и интеграции.
+# JobFinder — Remote Web Jobs
 
-## Запуск
+A local tool for finding and analyzing remote jobs in web development, HTML/CSS implementation, web service support, QA, infrastructure, web design, technical analysis, and integrations. It focuses on roles with Russian-language workplace communication that allow working from Russia or do not explicitly prohibit it.
 
-Node.js 24+ (SQLite встроен в Node).
+## Getting started
+
+Requires Node.js 24+ with built-in SQLite support.
 
 ```sh
 npm install
 npm run dev
 ```
 
-Сбор идёт вместе с сервером. Для отдельного фонового процесса: `npm run collect`. CLI и веб-сервер используют одну базу и общие аренды/лимиты запросов. Наличие открытого браузера не требуется.
+Collection runs alongside the web server. To run a separate background collector, use `npm run collect`. The CLI and web server share the same database, worker leases, and request limits. A browser does not need to stay open.
 
-## Отбор
+## Job selection
 
-- Только роли, связанные с вебом. У общих технических должностей требуется контекст веба в описании или навыках: HTTP, браузер, сайты, веб-сервисы, REST, веб-фреймворки и т. п.
-- Не сохраняются маркетинг, инфлюенс, продажи, преподавание, чисто мобильная/игровая/встраиваемая разработка, бухгалтерия и поддержка оборудования.
-- Полное описание обязательно; поисковая карточка ещё не является сохранённой вакансией.
-- Руководители, senior/sr, lead/тимлиды, head/director, staff/principal, ведущие и старшие специалисты исключены во всех выдачах и статистике. Проверяются название, отдельный грейд и явное требование уровня в описании. Упоминание наставника или работы под руководством senior не исключает junior/middle. Уже собранные записи скрываются меткой без потери истории; новые неподходящие не сохраняются.
-- Русскоязычная рабочая коммуникация; при английском описании нужен явный признак русскоязычной команды. Английский для документации допускается.
-- Явный запрет работы из РФ, обязательная иностранная резиденция и ограниченные списки стран без РФ исключаются. Отсутствие запрета допускается. Отбор эвристический, спорные условия проверяются по оригиналу.
-- Сохраняются удалёнка и гибрид; по умолчанию в интерфейсе только полностью удалённые вакансии.
+- Only web-related roles qualify. General technical positions must include web context in their descriptions or skills, such as HTTP, browsers, websites, web services, REST, or web frameworks.
+- Marketing, influencer marketing, sales, teaching, purely mobile/game/embedded development, accounting, and hardware support are excluded.
+- A full description is required. A search result alone does not become a saved vacancy.
+- Management and senior roles are excluded from all listings and statistics: senior/sr, lead/team lead, head/director, staff/principal, and equivalent Russian titles. Selection checks the title, structured seniority, and explicit level requirements in the description. Mentoring or working under a senior colleague does not exclude junior/middle positions. Previously collected jobs are hidden with a flag while preserving history; new ineligible jobs are not saved.
+- Workplace communication must be in Russian. An English description requires explicit evidence of a Russian-speaking team. English for reading documentation is allowed.
+- Jobs explicitly prohibiting work from Russia, requiring residence abroad, or restricting applicants to a list of countries that excludes Russia are rejected. The absence of a prohibition is accepted. Selection is heuristic; ambiguous requirements should be checked in the original posting.
+- Both remote and hybrid jobs are stored. The interface shows fully remote jobs by default.
 
-Правила: `server/web-scope.ts`, `server/selection.ts`, `src/lib/market-policy.ts`. Версия отбора: `web-remote-v2`.
+Selection rules: `server/web-scope.ts`, `server/selection.ts`, and `src/lib/market-policy.ts`. Selection version: `web-remote-v2`.
 
-## Интерфейс
+## Interface
 
-Главная — поиск по должности, тексту и компании; фильтры профессии, опыта, даты и зарплаты; карточки с полным описанием и источниками. Раскрываемая аналитика показывает профессии, языки, технологии и инструменты; метки кликабельны. Статистика относится к собранной выборке, а не всему рынку.
+The main page provides search by title, description, and company; filters for profession, experience, publication date, and salary; and vacancy cards with full descriptions and source links. Expandable analytics show professions, programming languages, technologies, and tools, with clickable filters. Statistics describe the collected sample, not the entire job market.
 
-Раскрываемый сборщик показывает цветные треки, очереди, последние задания, ошибки и журнал. Источники можно приостановить отдельно или все вместе. Приостановка не сбрасывает ограничения сайта.
+The expandable collector panel displays colored source tracks, queues, recent tasks, errors, and an event log. Sources can be paused individually or together. Pausing does not reset a website's cooldown.
 
-«Откликнулся» убирает вакансию из активной выдачи. Раздел «Обработанные» хранит историю; «Сопроводительное» — предоставленное пользователем письмо и копирование. У подходящих вакансий письмо копируется прямо из карточки.
+Marking a vacancy as applied removes it from active listings. The processed jobs section preserves application history. The cover letter section stores the user's letter and provides a copy button; eligible vacancy cards also let you copy it directly.
 
-## Как устроен сбор
+## How collection works
 
-- HH: целевые запросы веба и технических профессий вместо полного обхода всех профессий. Прежде чем загрузить описание, отбрасываются явно посторонние кандидаты. Список уникален по ID, карточки кэшируются на три дня, новые поисковые окна добавляются с перекрытием. Публичный API проверен 16.11.2026: с этой машины возвращает 403, поэтому используется HTML. Капча и запрет доступа не обходятся.
-- Habr Career, Geekjob, БУДУ: публичная выдача → предварительный отбор по названию → полная карточка/JSON-LD. Для Habr включена удалёнка.
-- getmatch: sitemap → отбор технических URL → проверка полных карточек, начиная с новых ID. До 1000 релевантных ссылок за проход; компаниям и остальному архиву обход не назначается.
-- Greenhouse: небольшой список без `content=true` → предварительный отбор технических должностей и грейда → отдельные полные карточки. HTML описаний декодируется перед общим отбором.
-- Lever: публичный API с `limit=1&skip=N`; короткие страницы обходятся последовательно с интервалом хоста. Каждая страница обновляется раз в шесть часов; предел 1000 позиций на борд за проход.
-- We Work Remotely (RSS) и Ashby (API) сохраняют общий строгий отбор. Международная лента сама по себе не означает подходящую вакансию. Названия бордов нормализуются, одинаковые борды под разным регистром не обходятся дважды.
-- После проверки 16.11.2026 удалены неработающие с этой машины Himalayas, Remotive, Remote OK и две Telegram-ленты. Они исключены из запуска и UI; старые задания остановлены без удаления вакансий и истории. Причины и способы проверки — [отчёт о сборщиках](docs/worker-health.md).
-- При наличии ETag/Last-Modified запросы условные. На 304 повторная загрузка и разбор пропускаются; только успешно разобранный ответ обновляет валидаторы.
-- До трёх внешних запросов одновременно плюс отдельный HH; интервалы хоста и аренды общие для всех процессов. На 403/429 и сетевые ошибки — автоматическая пауза с Retry-After. Недоступность одного сайта не блокирует остальные.
+- **HH:** targeted searches for web and technical roles instead of crawling every profession. Clearly unrelated candidates are rejected before their descriptions are fetched. Jobs are deduplicated by ID, detail pages are cached for three days, and new search windows overlap to reduce missed results. A check on November 16, 2026 returned HTTP 403 from the public API on this machine, so the collector uses HTML pages. It does not bypass CAPTCHAs or access restrictions.
+- **Habr Career, Geekjob, and BUDU:** public search results → preliminary title filtering → full vacancy pages/JSON-LD. Habr searches request remote jobs.
+- **getmatch:** sitemap → technical URL filtering → full vacancy checks, starting with the newest IDs. Up to 1,000 relevant links are scheduled per pass; company pages and the rest of the archive are not crawled.
+- **Greenhouse:** a small listing without `content=true` → preliminary role and seniority filtering → individual full descriptions. Escaped HTML is decoded before the shared selection rules run.
+- **Lever:** the public API with `limit=1&skip=N`. Small pages are fetched sequentially with per-host pacing. Each page refreshes every six hours, with a limit of 1,000 positions per board per pass.
+- **We Work Remotely (RSS) and Ashby (API):** the same strict selection rules apply. An international feed does not automatically make a vacancy eligible. Board names are normalized so case variations do not trigger duplicate collection.
+- **Retired sources:** checks on November 16, 2026 found Himalayas, Remotive, Remote OK, and two Telegram feeds unavailable from this machine. They were removed from scheduling and the UI; old tasks were stopped without deleting vacancies or history. See the [collector health report (Russian)](docs/worker-health.md) for findings and verification details.
+- Requests use conditional headers when ETag/Last-Modified validators are available. HTTP 304 skips downloading and parsing the body; only successfully parsed responses update the validators.
+- Up to three external requests run concurrently, plus a separate HH worker. Per-host pacing and worker leases are shared across processes. HTTP 403/429 and network errors trigger automatic backoff, respecting Retry-After. An unavailable source does not stop the others.
 
-Дубликаты объединяются по исходному URL/ID или точному совпадению работодателя, должности и текста. Ссылки с агрегатора на HH распознаются, но повторный обход HH по ним не запускается. Неявные редиректы и пересказы могут остаться отдельными объявлениями.
+Duplicates are merged by original URL/ID or an exact match of employer, title, and description. Aggregator links to HH are recognized without starting another HH crawl. Indirect redirects and rewritten postings may remain separate records.
 
-Источники и интервалы — `src/lib/sources.ts`; очередь/запуск — `server/source-state.ts`, `server/source-runner.ts`; парсеры — `server/source-adapters.ts`.
+Source definitions and intervals: `src/lib/sources.ts`. Queue and execution: `server/source-state.ts` and `server/source-runner.ts`. Parsers: `server/source-adapters.ts`.
 
-Документация: [HH API](https://api.hh.ru/openapi/redoc), [Greenhouse Job Board API](https://docs.greenhouse.io/job-board.html), [Lever Postings API](https://github.com/lever/postings-api).
+API documentation: [HH API](https://api.hh.ru/openapi/redoc), [Greenhouse Job Board API](https://docs.greenhouse.io/job-board.html), and [Lever Postings API](https://github.com/lever/postings-api).
 
-## Данные и сброс
+## Data and reset
 
-SQLite: `data/jobfinder.sqlite`, исключена из Git и HTTP-доступа. Хранятся вакансии, навыки, словари, очереди, HTTP-валидаторы, журнал и отдельная история откликов. Ключи в клиент не передаются.
+SQLite data is stored in `data/jobfinder.sqlite`, excluded from Git and HTTP access. The database holds vacancies, skills, dictionaries, queues, HTTP validators, event logs, and a separate application history. API keys are not sent to the client.
 
 ```sh
 npm run reset-data -- --fresh-sources
 ```
 
-Сбрасывает вакансии, очереди и состояние источников, сохраняет личные отметки и их снимки. Сборщики перед таким сбросом нужно остановить и затем запустить заново: свежие очереди создаются при старте. `--paused` оставляет сбор выключенным. Обычный `npm run reset-data` сохраняет зарегистрированные борды и повторяющиеся задачи. `JOBFINDER_DB` позволяет использовать отдельную базу в проверках.
+This clears vacancies, queues, and source state while preserving personal marks and their snapshots. Stop the collectors before resetting and restart them afterward; fresh queues are created on startup. Add `--paused` to leave collection disabled. Running `npm run reset-data` without `--fresh-sources` preserves registered boards and recurring tasks. Use `JOBFINDER_DB` to select a separate database for checks.
 
-## Проверки
+## Validation
 
 ```sh
 npm test
@@ -70,4 +72,4 @@ npm run build
 npm run audit-data
 ```
 
-Тесты проверяют веб-отбор, язык и страны, дедупликацию, устойчивые очереди, блокировки, 304, сохранность личных отметок, фильтры и статистику. `audit-data` открывает реальную базу только для чтения.
+Tests cover web role selection, language and geographic restrictions, deduplication, persistent queues, worker leases and backoff, HTTP 304 handling, preservation of personal marks, filters, and statistics. `audit-data` opens the live database in read-only mode.
